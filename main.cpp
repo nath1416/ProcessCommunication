@@ -29,7 +29,7 @@ void readMessageFromQueue(std::mutex *mtx, std::condition_variable *cv, std::que
     *value = queue->front();
     queue->pop();
     lock.unlock();
-    cv->notify_one();
+    cv->notify_one(); // maybe not needed
 }
 
 void readFromStdin() {
@@ -37,7 +37,6 @@ void readFromStdin() {
     while (true) {
         if (std::getline(std::cin, line)) {
             addMessageToQueue(&incomingMtx, &incommingCv, &incomingMessages, &line);
-            addMessageToQueue(&outcomingMtx, &outcommingCv, &outcomingMessages, &line);
         } else {
             break; 
         }
@@ -55,12 +54,12 @@ void writeToStdout() {
 
 void changeState() {
     while (true) {
-        std::unique_lock<std::mutex> lock(incomingMtx);
-        incommingCv.wait(lock, []{return !incomingMessages.empty();});
-        std::string message = incomingMessages.front();
-        incomingMessages.pop();
-        lock.unlock();
-
+        std::string line;
+        readMessageFromQueue(&incomingMtx, &incommingCv, &incomingMessages, &line);
+        if(line == "Start"){
+            std::string a("received start");
+            addMessageToQueue(&outcomingMtx, &outcommingCv, &outcomingMessages, &a);
+        }
     }
 }
 

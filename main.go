@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"strings"
 	"time"
-
 )
 
 const EXE_FILE = "./cpu_server"
@@ -89,6 +88,11 @@ func startEmulatorGui() {
 			parseStd(msg, false)
 		case sendLine <- fmt.Sprintf("%s", num):
 			num++
+			fmt.Printf("\t%d\n", num)
+			if num%2 == 0 {
+				sendLine <- "Start"
+			}
+
 		default:
 		}
 		time.Sleep(10 * time.Millisecond)
