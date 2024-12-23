@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os/exec"
-	"time"
+	// "time"
 	"strings"
 	// "os"
 )
@@ -60,7 +60,7 @@ func speakToChildProcess(stdin io.WriteCloser) {
 	for i := 0; i < 5000; i++ {
 		writer.WriteString(fmt.Sprintf("it:,%s\n",i))
 		writer.Flush()
-		time.Sleep(1 * time.Second) 
+		// time.Sleep(1 * time.Second) 
 	}
 }
 
@@ -74,8 +74,8 @@ func startEmulatorGui() {
 	if err = cmd.Start(); err != nil {
 		fmt.Println(err)
 	}
-	go speakToChildProcess(stdin)
-	go listenToChildProcess(stdout)
+	speakToChildProcess(stdin)
+	listenToChildProcess(stdout)
 }
 func main() {
 	startEmulatorGui()
