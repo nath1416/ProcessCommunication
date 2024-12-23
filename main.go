@@ -8,10 +8,12 @@ import (
 	"os/exec"
 	"time"
 	"strings"
-	// "os"
 )
 
 const EXE_FILE = "./cpu_server"
+
+var received bool = false
+var sent bool = false
 
 func startWebServer() {
 	fmt.Println("EmulatorGui is running on port 3000")
@@ -25,14 +27,14 @@ func parseStd(line string, isPrefix bool) {
 	words := strings.Fields(line)
 	ID := words[0]
 	switch ID {
-	case "PID":
-		fmt.Printf("\t{%s} \t%s %b\n", ID, words[1:], isPrefix)
-	case "READY":
-		fmt.Print("Start Cycle\n")
-	case "EndCycle":
-		fmt.Print("End cycle\n")
+	// case "PID":
+	// 	fmt.Printf("\t{%s} \t%s %b\n", ID, words[1:], isPrefix)
+	// case "READY":
+	// 	fmt.Print("Start Cycle\n")
+	// case "EndCycle":
+	// 	fmt.Print("End cycle\n")
 	default:
-		fmt.Printf("XXX\t{%s}  %s\t%b\n", ID, words[1:], isPrefix)
+		fmt.Printf("\t{%s}\t%s %b\n", ID, words[1:], isPrefix)
 	}
 }
 
@@ -44,6 +46,7 @@ func listenToChildProcess(stdout io.ReadCloser) error {
 		if err != nil {
 			return err
 		}
+		received = true
 		parseStd(string(line), isPrefix)
 	}
 }
@@ -51,9 +54,14 @@ func listenToChildProcess(stdout io.ReadCloser) error {
 func speakToChildProcess(stdin io.WriteCloser) error {
 	writer := bufio.NewWriter(stdin)
 	for i := 0; i < 5000; i++ {
-		writer.WriteString(fmt.Sprintf("it:,%s\n", i))
-		writer.Flush()
-		time.Sleep(1 * time.Second)
+		time.Sleep(3 * time.Second)
+		if _, err := writer.WriteString(fmt.Sprintf("it:,%s\n", i)); err != nil {
+			return err
+		}
+		if err := writer.Flush(); err != nil{
+			return err
+		}
+		sent = true
 	}
 	return nil
 }
@@ -69,11 +77,10 @@ func startEmulatorGui() {
 		fmt.Println(err)
 	}
 
-	// Run speakToChildProcess and listenToChildProcess in separate goroutines
 	go func() { _ = speakToChildProcess(stdin) }()
 	go func() { _ = listenToChildProcess(stdout) }()
 
-	// Optionally, you can wait for the child process to finish
+
 	err = cmd.Wait()
 	if err != nil {
 		fmt.Println("Error waiting for child process:", err)
