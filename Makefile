@@ -1,9 +1,10 @@
 BUILD=build/
 
 all:
-	go build -o emulator_gui main.go
+	go build -o go_server main.go
+	g++ main.cpp -o cpu_server
 
 run: all
-	./emulator_gui
+	./go_server
 clean:
-	rm emulator_gui
+	rm go_server

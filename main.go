@@ -10,6 +10,8 @@ import (
 	// "os"
 )
 
+const EXE_FILE = "./cpu_server"
+
 func startWebServer() {
 	// // http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 	// // 	w.Write([]byte(html))
@@ -25,42 +27,53 @@ func startWebServer() {
 	}
 }
 
-func parseStd(line string) {
+func parseStd(line string, isPrefix bool) {
 	words := strings.Fields(line)
-
-	switch words[0] {
-	case "Register":
-		fmt.Printf("Register: %s\n", words[1:])
-	case "StartCycle":
+	ID := words[0]
+	switch ID {
+	case "PID":
+		fmt.Printf("\t{%s} \t%s %b\n", ID, words[1:], isPrefix)
+	case "READY":
 		fmt.Print("Start Cycle\n")
 	case "EndCycle":
 		fmt.Print("End cycle\n")
 	default:
-		fmt.Print(words)
+		fmt.Printf("XXX\t{%s}  %s\t%b\n", ID, words[1:], isPrefix)
 	}
+}
 
+func listenToChildProcess(stdout io.ReadCloser) error {
+	buf := bufio.NewReader(stdout)
+	fmt.Printf("Stdout:\n")
+	for {
+		line, isPrefix, err := buf.ReadLine()
+		if err != nil {
+			return err
+		}
+		parseStd(string(line), isPrefix)
+	}
+}
+
+func speakToChildProcess(stdin io.WriteCloser) {
+	writer := bufio.NewWriter(stdin)
+	for i := 0; i < 5000; i++ {
+		writer.WriteString(fmt.Sprintf("it:,%s\n",i))
+		writer.Flush()
+	}
 }
 
 func startEmulatorGui() {
-	cmd := exec.Command("./build/emulator_cpu")
+	cmd := exec.Command(EXE_FILE)
 	stdout, err := cmd.StdoutPipe()
+	stdin, err := cmd.StdinPipe()
+	defer stdin.Close()
 	defer stdout.Close()
-	err = cmd.Start()
-	if err != nil {
+
+	if err = cmd.Start(); err != nil {
 		fmt.Println(err)
 	}
-	buf := bufio.NewReader(stdout)
-	for {
-		line, _, err := buf.ReadLine()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			fmt.Println(err)
-			return
-		}
-		parseStd(string(line))
-		// fmt.Println(string(line))
-	}
+	speakToChildProcess(stdin)
+	listenToChildProcess(stdout)
 }
 func main() {
 	startEmulatorGui()
