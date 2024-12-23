@@ -6,8 +6,9 @@ import (
 	"io"
 	"net/http"
 	"os/exec"
-	"time"
 	"strings"
+	"time"
+
 )
 
 const EXE_FILE = "./cpu_server"
@@ -38,32 +39,31 @@ func parseStd(line string, isPrefix bool) {
 	}
 }
 
-func listenToChildProcess(stdout io.ReadCloser) error {
+func listenToChildProcess(stdout io.ReadCloser, receivedLine chan<- string) error {
 	buf := bufio.NewReader(stdout)
 	fmt.Printf("Stdout:\n")
 	for {
-		line, isPrefix, err := buf.ReadLine()
+		line, _, err := buf.ReadLine()
 		if err != nil {
 			return err
 		}
 		received = true
-		parseStd(string(line), isPrefix)
+		receivedLine <- string(line)
 	}
 }
 
-func speakToChildProcess(stdin io.WriteCloser) error {
+func speakToChildProcess(stdin io.WriteCloser, sendLine <-chan string) error {
 	writer := bufio.NewWriter(stdin)
-	for i := 0; i < 5000; i++ {
-		time.Sleep(3 * time.Second)
-		if _, err := writer.WriteString(fmt.Sprintf("it:,%s\n", i)); err != nil {
+	for {
+		line := <-sendLine
+
+		if _, err := writer.WriteString(fmt.Sprintf("%s\n", line)); err != nil {
 			return err
 		}
-		if err := writer.Flush(); err != nil{
+		if err := writer.Flush(); err != nil {
 			return err
 		}
-		sent = true
 	}
-	return nil
 }
 
 func startEmulatorGui() {
@@ -77,14 +77,27 @@ func startEmulatorGui() {
 		fmt.Println(err)
 	}
 
-	go func() { _ = speakToChildProcess(stdin) }()
-	go func() { _ = listenToChildProcess(stdout) }()
+	receivedLine := make(chan string, 10)
+	sendLine := make(chan string, 10)
 
+	go func() { _ = speakToChildProcess(stdin, sendLine) }()
+	go func() { _ = listenToChildProcess(stdout, receivedLine) }()
 
-	err = cmd.Wait()
-	if err != nil {
-		fmt.Println("Error waiting for child process:", err)
+	for {
+
+		select {
+		case msg := <-receivedLine:
+			parseStd(msg, false)
+		case sendLine <- fmt.Sprintf("%s", 1):
+			time.Sleep(1 * time.Second)
+		default:
+		}
 	}
+
+	// err = cmd.Wait()
+	// if err != nil {
+	// 	fmt.Println("Error waiting for child process:", err)
+	// }
 }
 
 func main() {
