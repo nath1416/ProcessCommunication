@@ -11,23 +11,33 @@ std::mutex outcomingMtx;
 std::queue<std::string> incomingMessages;
 std::queue<std::string> outcomingMessages;
 
-std::condition_variable cv;
+std::condition_variable outcommingCv;
+std::condition_variable incommingCv;
+
+
+template <typename T> 
+void addMessageToQueue(std::mutex *mtx, std::condition_variable *cv, std::queue<T> *queue, T *value){
+    std::unique_lock<std::mutex> lock(*mtx);
+    queue->push(*value);
+    lock.unlock();
+    cv->notify_one();
+}
+template <typename T> 
+void readMessageFromQueue(std::mutex *mtx, std::condition_variable *cv, std::queue<T> *queue, T *value){
+    std::unique_lock<std::mutex> lock(*mtx);
+    cv->wait(lock, [queue](){ return !queue->empty(); });
+    *value = queue->front();
+    queue->pop();
+    lock.unlock();
+    cv->notify_one();
+}
 
 void readFromStdin() {
     std::string line;
     while (true) {
         if (std::getline(std::cin, line)) {
-            {
-            std::lock_guard<std::mutex> lock(incomingMtx);
-            incomingMessages.push(line);
-            }
-            {
-                std::lock_guard<std::mutex> lock(outcomingMtx);
-                outcomingMessages.push("received a packet");
-                cv.notify_one();
-            }
-            // std::cout << "SLAVE Read from stdin: " << line << std::endl;
-
+            addMessageToQueue(&incomingMtx, &incommingCv, &incomingMessages, &line);
+            addMessageToQueue(&outcomingMtx, &outcommingCv, &outcomingMessages, &line);
         } else {
             break; 
         }
@@ -37,22 +47,29 @@ void readFromStdin() {
 void writeToStdout() {
     int count = 0;
     while (true) {
-        std::unique_lock<std::mutex> lock(outcomingMtx);
-        
-        cv.wait(lock, []{return !outcomingMessages.empty();});
-
-        std::string message = outcomingMessages.front();
-        outcomingMessages.pop();
-        std::cout << "SLAVE Write to stdout: " << message << std::endl;
-        // std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+        std::string line;
+        readMessageFromQueue(&outcomingMtx, &outcommingCv, &outcomingMessages, &line);
+        std::cout << "SLAVE Write to stdout: " << line << std::endl;
     }
 }
+
+void changeState() {
+    while (true) {
+        std::unique_lock<std::mutex> lock(incomingMtx);
+        incommingCv.wait(lock, []{return !incomingMessages.empty();});
+        std::string message = incomingMessages.front();
+        incomingMessages.pop();
+        lock.unlock();
+
+    }
+}
+
 
 int main() {
     std::thread reader(readFromStdin);
     std::thread writer(writeToStdout);
+    std::thread writers(changeState);
 
-    // std::cout << "Main thread is running..." << std::endl;
     for (int i = 0; i < 5; ++i) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }

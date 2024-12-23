@@ -82,16 +82,16 @@ func startEmulatorGui() {
 
 	go func() { _ = speakToChildProcess(stdin, sendLine) }()
 	go func() { _ = listenToChildProcess(stdout, receivedLine) }()
-
+	num := 0
 	for {
-
 		select {
 		case msg := <-receivedLine:
 			parseStd(msg, false)
-		case sendLine <- fmt.Sprintf("%s", 1):
-			time.Sleep(1 * time.Second)
+		case sendLine <- fmt.Sprintf("%s", num):
+			num++
 		default:
 		}
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	// err = cmd.Wait()
