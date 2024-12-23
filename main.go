@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os/exec"
-	// "time"
+	"time"
 	"strings"
 	// "os"
 )
@@ -14,13 +14,6 @@ import (
 const EXE_FILE = "./cpu_server"
 
 func startWebServer() {
-	// // http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-	// // 	w.Write([]byte(html))
-	// // })
-	// // err := http.ListenAndServe(":3000", nil)
-	// // if err != nil {
-	// // 	fmt.Println(err)
-	// // }
 	fmt.Println("EmulatorGui is running on port 3000")
 	http.Handle("/", http.FileServer(http.Dir("./static")))
 	if err := http.ListenAndServe(":3000", nil); err != nil {
@@ -55,13 +48,14 @@ func listenToChildProcess(stdout io.ReadCloser) error {
 	}
 }
 
-func speakToChildProcess(stdin io.WriteCloser) {
+func speakToChildProcess(stdin io.WriteCloser) error {
 	writer := bufio.NewWriter(stdin)
 	for i := 0; i < 5000; i++ {
-		writer.WriteString(fmt.Sprintf("it:,%s\n",i))
+		writer.WriteString(fmt.Sprintf("it:,%s\n", i))
 		writer.Flush()
-		// time.Sleep(1 * time.Second) 
+		time.Sleep(1 * time.Second)
 	}
+	return nil
 }
 
 func startEmulatorGui() {
@@ -74,9 +68,19 @@ func startEmulatorGui() {
 	if err = cmd.Start(); err != nil {
 		fmt.Println(err)
 	}
-	speakToChildProcess(stdin)
-	listenToChildProcess(stdout)
+
+	// Run speakToChildProcess and listenToChildProcess in separate goroutines
+	go func() { _ = speakToChildProcess(stdin) }()
+	go func() { _ = listenToChildProcess(stdout) }()
+
+	// Optionally, you can wait for the child process to finish
+	err = cmd.Wait()
+	if err != nil {
+		fmt.Println("Error waiting for child process:", err)
+	}
 }
+
 func main() {
+	// startWebServer()
 	startEmulatorGui()
 }
