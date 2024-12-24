@@ -67,7 +67,7 @@ void changeState() {
 int main() {
     std::thread reader(readFromStdin);
     std::thread writer(writeToStdout);
-    std::thread writers(changeState);
+    std::thread changeState(changeState);
 
     for (int i = 0; i < 5; ++i) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
